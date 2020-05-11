@@ -1,0 +1,11 @@
+#ignore the gitignore file
+#.gitignore
+*.[oa]
+.DS_Store
+*.nlo
+*.nls
+*.nlg
+*.texpadtmp
+*.pdf
+*.idea
+__pycache__/*
