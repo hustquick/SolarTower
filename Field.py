@@ -1,5 +1,9 @@
 import numpy as np
-from Mirror import Mirror, Point
+from Mirror import Mirror
+from matplotlib import pyplot
+from shapely.geometry import Polygon, MultiPolygon
+from shapely.ops import unary_union
+from descartes import PolygonPatch
 
 
 def uni_vector(v):
@@ -159,3 +163,50 @@ for i in range(number_of_rings):
             points2[i][j][k] = np.dot(mirror_list[i][j].points[k].co, T) + mirror_list[i][j].center
             # 各顶点在光线坐标系中的坐标值
             points3[i][j][k] = coordinate_rotation_matrix(points2[i][j][k], v3)
+
+# 计算各镜面在光线方向的投影面积及遮挡之后的总面积
+GM = (np.sqrt(5) - 1.0) / 2.0
+W = 8.0
+H = W * GM
+SIZE = (W, H)
+BLUE = '#6699cc'
+GRAY = '#999999'
+
+polygons = []
+for i in range(number_of_rings):
+    for j in range(number[i]):
+        points_to_sunshine = [
+            points3[i][j][0][0:2],
+            points3[i][j][1][0:2],
+            points3[i][j][2][0:2],
+            points3[i][j][3][0:2],
+        ]
+        polygons.append(Polygon(points_to_sunshine))
+
+fig = pyplot.figure(1, figsize=SIZE, dpi=300)
+
+ax = fig.add_subplot(121)
+
+for ob in polygons:
+    p = PolygonPatch(ob, fc=GRAY, ec=GRAY, alpha=0.5, zorder=1)
+    ax.add_patch(p)
+
+ax.set_title('a) Before overlap')
+ax.axis('equal')
+# set_limits(ax, -2, 6, -2, 2)
+ax = fig.add_subplot(122)
+
+u = unary_union(polygons)
+patch2b = PolygonPatch(u, fc=BLUE, ec=BLUE, alpha=0.5, zorder=2)
+ax.add_patch(patch2b)
+
+ax.set_title('b) After overlap')
+ax.axis('equal')
+# set_limits(ax, -2, 6, -2, 2)
+
+pyplot.savefig('picture.pdf')
+pyplot.show()
+
+m = MultiPolygon(polygons)
+print("迎着太阳的总面积为：{:.2f}".format(m.area))
+print("被遮挡之后的总面积为：{:.2f}".format(u.area))
