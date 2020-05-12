@@ -1,1 +1,2 @@
-height = 115
+class Tower:
+    height = 115

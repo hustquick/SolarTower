@@ -1,38 +1,4 @@
-from scipy import linalg
 import numpy as np
-
-tower_height = 115
-mirror_length = 8
-mirror_center_height = 6
-min_distance = 11.6  # Should be larger than mirror_length * sqrt(2)
-base_radius = 115
-number_of_rings = 16
-
-radius = np.zeros(number_of_rings)
-number = np.zeros(number_of_rings)
-radius[0] = base_radius
-
-for i in range(number_of_rings - 1):
-    number[i] = np.floor(2*np.pi*radius[i]/min_distance)
-    distance_to_increase = np.ceil(mirror_length * radius[i] / 105)  # Why 105?
-    radius[i+1] = radius[i] + distance_to_increase
-
-number_of_mirrors = sum(number)
-
-# mirror = np.zeros(number_of_mirrors)
-mirror_center = []
-for i in range(len(radius) - 1):
-    number_of_mirrors_in_row = int(number[i])
-    theta = np.zeros(number_of_mirrors_in_row)
-    mirror_center.append(np.zeros([number_of_mirrors_in_row, 3]))
-    for j in range(number_of_mirrors_in_row):
-        theta[j] = 2 * j * np.pi / number[i]
-        mirror_center[i][j] = np.array([radius[i] * np.cos(theta[j]-np.pi/2), radius[i] * np.sin(theta[j]-np.pi/2),
-                                        mirror_center_height])
-
-zenith = np.deg2rad(37.22)
-altitude = np.deg2rad(52.78)
-azimuth = np.deg2rad(0)
 
 
 def uni_vector(v):
@@ -97,7 +63,7 @@ def axis_rotation_matrix(unit_rotation_axis, rotation_angle):
     return T
 
 
-def coordinate_rotate_matrix(point, vector_z):
+def coordinate_rotation_matrix(point, vector_z):
     """
     vector_x is defined in the xy plane
     :param point:
@@ -122,7 +88,47 @@ def coordinate_rotate_matrix(point, vector_z):
     return point_p
 
 
+def alpha(distance):
+    if distance < 1000:
+        return 0.99321-0.0001176*distance + 1.97e-8*distance**2
+    else:
+        return np.exp(-0.0001106*distance)
+
+
+tower_height = 115
+mirror_length = 8
+mirror_center_height = 6
+min_distance = 11.6  # Should be larger than mirror_length * sqrt(2)
+base_radius = 115
+number_of_rings = 16
+
+zenith = np.deg2rad(37.22)
+altitude = np.deg2rad(52.78)
+azimuth = np.deg2rad(0)
 v_sunshine = angle2vector(altitude, azimuth)
+
+radius = np.zeros(number_of_rings)
+number = np.zeros(number_of_rings)
+radius[0] = base_radius
+
+for i in range(number_of_rings - 1):
+    number[i] = np.floor(2*np.pi*radius[i]/min_distance)
+    distance_to_increase = np.ceil(mirror_length * radius[i] / 105)  # Why 105?
+    radius[i+1] = radius[i] + distance_to_increase
+
+number_of_mirrors = sum(number)
+
+# mirror = np.zeros(number_of_mirrors)
+mirror_center = []
+for i in range(len(radius) - 1):
+    number_of_mirrors_in_row = int(number[i])
+    theta = np.zeros(number_of_mirrors_in_row)
+    mirror_center.append(np.zeros([number_of_mirrors_in_row, 3]))
+    for j in range(number_of_mirrors_in_row):
+        theta[j] = 2 * j * np.pi / number[i]
+        mirror_center[i][j] = np.array([radius[i] * np.cos(theta[j]-np.pi/2), radius[i] * np.sin(theta[j]-np.pi/2),
+                                        mirror_center_height])
+
 mirror_normal_vector = []
 cosine_efficient = []
 for i in range(len(mirror_center)):
@@ -136,25 +142,18 @@ for i in range(len(mirror_center)):
         cosine_efficient[i][j] = cosine(mirror_normal_vector[i][j], v_sunshine)
 
 
-def alpha(distance):
-    if distance < 1000:
-        return 0.99321-0.0001176*distance + 1.97e-8*distance**2
-    else:
-        return np.exp(-0.0001106*distance)
 
-
-point_A_relative = np.array([mirror_length/2, mirror_length/2, 0])
-point_A = point_A_relative + mirror_center[0][1]
-v_before = np.array([0, 0, 1])
-v_after = mirror_normal_vector[0][1]
-axis, angle = calculate_rotation(v_before, v_after)
-T = axis_rotation_matrix(axis, angle)
-# After rotation
-point_A1_relative = np.dot(point_A_relative, T)
-point_A1 = point_A1_relative + mirror_center[0][1]
-
-v1_before = mirror_normal_vector[0][1]
-v1_after = v_sunshine
-axis1, angle1 = calculate_rotation(v1_before, v1_after)
-point_A2 = coordinate_rotate_matrix(point_A1, v_sunshine)
-
+# 1代表各镜面坐标系，2代表塔坐标系（世界坐标系），3代表光线坐标系
+points1 = np.array([
+    [mirror_length/2, mirror_length/2, 0],
+    [-mirror_length/2, mirror_length/2, 0],
+    [-mirror_length/2, -mirror_length/2, 0],
+    [mirror_length/2, -mirror_length/2, 0],
+                           ])
+v1_horizontal = np.array([0, 0, 1])
+v2 = mirror_normal_vector
+rotation_axis, rotation_angle = calculate_rotation(v1_horizontal, v2[0][1])
+T = axis_rotation_matrix(rotation_axis, rotation_angle)
+points2 = np.dot(points1, T) + mirror_center[0][1]
+v3 = v_sunshine
+points3 = coordinate_rotation_matrix(points2[0], v3)
