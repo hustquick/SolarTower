@@ -4,6 +4,9 @@ from matplotlib import pyplot
 from shapely.geometry import Polygon, MultiPolygon
 from shapely.ops import unary_union
 from descartes import PolygonPatch
+import ephem
+import datetime
+import geocoder
 
 
 def uni_vector(v):
@@ -35,9 +38,6 @@ def vector2angle(a, b, c):
 def cosine(v1, v2):
     """
     v1 and v2 are unit vectors
-    :param v1:
-    :param v2:
-    :return:
     """
     return v1.dot(v2)
 
@@ -71,9 +71,6 @@ def axis_rotation_matrix(unit_rotation_axis, rotation_angle):
 def coordinate_rotation_matrix(point, vector_z):
     """
     vector_x is defined in the xy plane
-    :param point:
-    :param vector_z:
-    :return:
     """
     z1, z2, z3 = vector_z
     vector_x = np.array([z2, -z1, 0])/np.sqrt(z1*z1 + z2*z2)
@@ -100,6 +97,15 @@ def alpha(distance):
         return np.exp(-0.0001106*distance)
 
 
+def get_LatLng():
+    g = geocoder.ip('me')
+    latlng = g.latlng
+    print("\n根据你的IP地址")
+    # print("你所在城市为:\n" + g.city)
+    print("你的经度为：\t%8.4f \n你的纬度为：\t%8.4f" % (latlng[1], latlng[0]))
+    return latlng
+
+
 mirror_typical = Mirror()
 tower_height = 115
 mirror_length = mirror_typical.length
@@ -110,9 +116,18 @@ number_of_rings = 16
 
 # 1代表各镜面坐标系，2代表塔坐标系（世界坐标系），3代表光线坐标系
 v1 = np.array([0, 0, 1])     # 镜面法线向量在镜面坐标系中的坐标值
-# zenith = np.deg2rad(37.22)
-altitude = np.deg2rad(52.78)
-azimuth = np.deg2rad(0)
+# 计算太阳高度角
+lalo = get_LatLng()     # 计算当前经纬度
+gatech = ephem.Observer()
+gatech.lon, gatech.lat = str(lalo[1]), str(lalo[0])
+gatech.date = datetime.datetime.utcnow()    # 计算当前时间
+print("\n当前时间为:\n%s" % ephem.localtime(gatech.date))
+sun = ephem.Sun()
+sun.compute(gatech)
+
+print("太阳高度角: %s \n太阳方位角: %s" % (sun.alt, sun.az))
+altitude = sun.alt
+azimuth = sun.az
 v3 = angle2vector(altitude, azimuth)    # 光线向量在世界坐标系中的坐标值
 
 
