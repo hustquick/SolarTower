@@ -1,4 +1,5 @@
 import numpy as np
+from Mirror import Mirror, Point
 
 
 def uni_vector(v):
@@ -13,10 +14,10 @@ def angular_bisector_vector(v1, v2):
 
 
 def angle2vector(alt, azi):
-    theta = np.pi/2 - alt
-    x = np.sin(theta)*np.sin(azi)
-    y = np.sin(theta)*np.cos(azi)
-    z = np.cos(theta)
+    angle1 = np.pi/2 - alt
+    x = np.sin(angle1)*np.sin(azi)
+    y = np.sin(angle1)*np.cos(azi)
+    z = np.cos(angle1)
     return np.array([x, y, z])
 
 
@@ -38,8 +39,8 @@ def cosine(v1, v2):
 
 
 def calculate_rotation(vector_before, vector_after):
-    rotation_axis = np.cross(vector_before, vector_after)
-    rotation_axis = uni_vector(rotation_axis)
+    rotation_axis_ = np.cross(vector_before, vector_after)
+    rotation_axis = uni_vector(rotation_axis_)
     rotation_angle = np.arccos(np.dot(vector_before, vector_after))
     return rotation_axis, rotation_angle
 
@@ -95,65 +96,66 @@ def alpha(distance):
         return np.exp(-0.0001106*distance)
 
 
+mirror_typical = Mirror()
 tower_height = 115
-mirror_length = 8
-mirror_center_height = 6
-min_distance = 11.6  # Should be larger than mirror_length * sqrt(2)
+mirror_length = mirror_typical.length
+mirror_center_height = mirror_typical.center_height
+min_distance = 11.6  # Should be larger than mirror.length * sqrt(2)
 base_radius = 115
 number_of_rings = 16
 
-zenith = np.deg2rad(37.22)
+# 1代表各镜面坐标系，2代表塔坐标系（世界坐标系），3代表光线坐标系
+v1 = np.array([0, 0, 1])     # 镜面法线向量在镜面坐标系中的坐标值
+# zenith = np.deg2rad(37.22)
 altitude = np.deg2rad(52.78)
 azimuth = np.deg2rad(0)
-v_sunshine = angle2vector(altitude, azimuth)
+v3 = angle2vector(altitude, azimuth)    # 光线向量在世界坐标系中的坐标值
 
-radius = np.zeros(number_of_rings)
-number = np.zeros(number_of_rings)
+
+radius = np.zeros(number_of_rings)      # 用来记录各圈的半径
+number = np.zeros(number_of_rings, np.int)  # 用来记录各圈的镜子数目
 radius[0] = base_radius
-
 for i in range(number_of_rings - 1):
     number[i] = np.floor(2*np.pi*radius[i]/min_distance)
-    distance_to_increase = np.ceil(mirror_length * radius[i] / 105)  # Why 105?
+    distance_to_increase = np.ceil(mirror_length * radius[i] / 105)  # Why?
     radius[i+1] = radius[i] + distance_to_increase
+number[number_of_rings-1] = np.floor(2*np.pi*radius[number_of_rings-1]/min_distance)
 
-number_of_mirrors = sum(number)
+# 定义镜子列表
+mirror_list = [[Mirror() for j in range(number[i])] for i in range(number_of_rings)]
+number_of_mirrors = sum([len(mirror_list[i]) for i in range(len(mirror_list))])
 
-# mirror = np.zeros(number_of_mirrors)
-mirror_center = []
-for i in range(len(radius) - 1):
-    number_of_mirrors_in_row = int(number[i])
-    theta = np.zeros(number_of_mirrors_in_row)
-    mirror_center.append(np.zeros([number_of_mirrors_in_row, 3]))
-    for j in range(number_of_mirrors_in_row):
-        theta[j] = 2 * j * np.pi / number[i]
-        mirror_center[i][j] = np.array([radius[i] * np.cos(theta[j]-np.pi/2), radius[i] * np.sin(theta[j]-np.pi/2),
-                                        mirror_center_height])
+points2 = []    # 用于记录各镜子顶点旋转后在世界坐标系中的坐标值
+points3 = []    # 用于记录各镜子顶点旋转后在光线坐标系中的坐标值
+for i in range(number_of_rings):
+    points2.append(np.zeros((number[i], 4, 3)))
+    points3.append(np.zeros((number[i], 4, 3)))
+    for j in range(number[i]):
+        # 计算镜子中心坐标
+        delta_theta = 2 * j * np.pi / number[i]  # 记录镜子与塔之间连线与正北方向的夹角，逆时针为正
+        mirror_list[i][j].center = np.array([radius[i] * np.cos(delta_theta-np.pi/2),
+                                            radius[i] * np.sin(delta_theta-np.pi/2),
+                                            mirror_center_height])
 
-mirror_normal_vector = []
-cosine_efficient = []
-for i in range(len(mirror_center)):
-    mirror_normal_vector.append(np.zeros([len(mirror_center[i]), 3]))
-    cosine_efficient.append(np.zeros(len(mirror_center[i])))
-    for j in range(len(mirror_center[i])):
-        v_m2t = np.array([0, 0, tower_height]) - mirror_center[i][j]
-        mirror_normal_vector[i][j] = angular_bisector_vector(v_sunshine, v_m2t)
-        mirror_normal_angle = vector2angle(mirror_normal_vector[i][j][0], mirror_normal_vector[i][j][1],
-                                           mirror_normal_vector[i][j][2])
-        cosine_efficient[i][j] = cosine(mirror_normal_vector[i][j], v_sunshine)
+        # 计算镜子法线向量
+        v_m2t = np.array([0, 0, tower_height]) - mirror_list[i][j].center
+        mirror_list[i][j].orientation = angular_bisector_vector(v3, v_m2t)
 
+        # 计算镜子余弦损失
+        mirror_normal_angle = vector2angle(mirror_list[i][j].orientation[0],
+                                           mirror_list[i][j].orientation[1],
+                                           mirror_list[i][j].orientation[2]
+                                           )
+        mirror_list[i][j].cosine_efficient = cosine(mirror_list[i][j].orientation, v3)
 
-
-# 1代表各镜面坐标系，2代表塔坐标系（世界坐标系），3代表光线坐标系
-points1 = np.array([
-    [mirror_length/2, mirror_length/2, 0],
-    [-mirror_length/2, mirror_length/2, 0],
-    [-mirror_length/2, -mirror_length/2, 0],
-    [mirror_length/2, -mirror_length/2, 0],
-                           ])
-v1_horizontal = np.array([0, 0, 1])
-v2 = mirror_normal_vector
-rotation_axis, rotation_angle = calculate_rotation(v1_horizontal, v2[0][1])
-T = axis_rotation_matrix(rotation_axis, rotation_angle)
-points2 = np.dot(points1, T) + mirror_center[0][1]
-v3 = v_sunshine
-points3 = coordinate_rotation_matrix(points2[0], v3)
+        v2 = mirror_list[i][j].orientation  # 旋转之后，镜子的法线在世界坐标系中的坐标值
+        # 计算镜子旋转轴及旋转角
+        rotation_axis, rotation_angle = calculate_rotation(v1, v2)
+        # 计算绕轴旋转的旋转矩阵
+        T = axis_rotation_matrix(rotation_axis, rotation_angle)
+        # 计算旋转之后的镜子各顶点坐标
+        for k in range(4):
+            # 各顶点在世界坐标系中的坐标值
+            points2[i][j][k] = np.dot(mirror_list[i][j].points[k].co, T) + mirror_list[i][j].center
+            # 各顶点在光线坐标系中的坐标值
+            points3[i][j][k] = coordinate_rotation_matrix(points2[i][j][k], v3)
