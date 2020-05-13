@@ -83,10 +83,10 @@ def coordinate_rotation_matrix(point, vector_z):
         [ 0,  0,  0,  1],
                  ])
     p1, p2, p3 = point
-    p4 = np.array([p1, p2, p3, 1])
-    p4_p = np.dot(p4, R)
-    point_p = p4_p[0:3]
-    return point_p
+    p4 = np.array([p1, p2, p3, 1]).reshape(-1, 1)
+    p4_p = np.dot(R, p4)
+    point_p = p4_p[:][0:3]
+    return point_p.ravel()
 
 
 def alpha(distance):
@@ -141,7 +141,7 @@ number = np.zeros(number_of_rings, np.int)  # 用来记录各圈的镜子数目
 radius[0] = base_radius
 for i in range(number_of_rings - 1):
     number[i] = np.floor(2*np.pi*radius[i]/min_distance)
-    distance_to_increase = np.ceil(mirror_length * radius[i] / 135)  # Why?
+    distance_to_increase = np.ceil(mirror_length * radius[i] / 105)  # Why?
     radius[i+1] = radius[i] + distance_to_increase
 number[number_of_rings-1] = np.floor(2*np.pi*radius[number_of_rings-1]/min_distance)
 
