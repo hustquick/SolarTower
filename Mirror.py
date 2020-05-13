@@ -6,7 +6,7 @@ class Point:
         self.x = x
         self.y = y
         self.z = z
-        self.co = np.array([x, y, z])
+        self.co = np.array([x, y, z])   # 记录各顶点在其镜面坐标系中的坐标值
 
 
 class Mirror:
