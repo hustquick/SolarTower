@@ -107,24 +107,26 @@ def get_lalo():
 
 mirror_typical = Mirror()   # 取一面典型的镜子，获取其参数值。
 mirror_length = mirror_typical.length
+mirror_width = mirror_typical.width
 mirror_center_height = mirror_typical.center_height
 tower_height = 115
-min_distance = 11.6  # Should be larger than mirror_length * sqrt(2)
+D = np.sqrt(mirror_length**2 + mirror_width**2)
+min_distance = 11.6  # Should be larger than D
 base_radius = 115
-number_of_rings = 16
+number_of_rings = 12
 
 # 1代表各镜面坐标系，2代表塔坐标系（世界坐标系，该坐标系中取正东为x轴正方向，正北为y轴正方向，竖直向上为z轴正方向），
 # 3代表光线坐标系
 v1 = np.array([0, 0, 1])     # 镜面法线向量在镜面坐标系中的坐标值
 # 计算太阳高度角
-lalo = [37.22, 97.23]   # 手动指定纬度和经度，也可以注释该行，反注释下行，自动获取当前位置的经纬度进行计算
-# lalo = get_lalo()     # 计算当前经纬度
+# lalo = [37.22, 97.23]   # 手动指定纬度和经度，也可以注释该行，反注释下行，自动获取当前位置的经纬度进行计算
+lalo = get_lalo()     # 计算当前经纬度
 observer = ephem.Observer()
 observer.lat, observer.lon = str(lalo[0]), str(lalo[1])
 
-observer.date = ephem.Date('2020/03/20 06:00:00.00')  # 手动指定时间(UTC时间)，也可以注释该行，反注释下面两行，自动获取当前时间进行计算
-# gatech.date = datetime.datetime.utcnow()    # 计算当前时间
-# print("\n当前时间为:\n%s" % ephem.localtime(gatech.date))
+# observer.date = ephem.Date('2020/03/20 07:00:00.00')  # 手动指定时间(UTC时间)，也可以注释该行，反注释下面两行，自动获取当前时间进行计算
+observer.date = datetime.datetime.utcnow()    # 计算当前时间
+print("\n当前时间为:\n%s" % ephem.localtime(observer.date))
 
 sun = ephem.Sun()
 sun.compute(observer)
@@ -141,7 +143,9 @@ number = np.zeros(number_of_rings, np.int)  # 用来记录各圈的镜子数目
 radius[0] = base_radius
 for i in range(number_of_rings - 1):
     number[i] = np.floor(2*np.pi*radius[i]/min_distance)
-    distance_to_increase = np.ceil(mirror_length * radius[i] / 105)  # Why?
+    alpha = np.arctan(radius[i] / (tower_height - mirror_center_height))
+    beta = np.arcsin(D/2/np.sqrt(radius[i]**2+(tower_height-mirror_center_height)**2))
+    distance_to_increase = D/np.cos(alpha + beta)
     radius[i+1] = radius[i] + distance_to_increase
 number[number_of_rings-1] = np.floor(2*np.pi*radius[number_of_rings-1]/min_distance)
 
