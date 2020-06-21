@@ -42,7 +42,7 @@ def cosine(v_1, v_2):
 def calculate_rotation(vector_before, vector_after):
     rotation_axis_ = np.cross(vector_before, vector_after)
     rot_axis = uni_vector(rotation_axis_)
-    rot_angle = np.arccos(np.dot(vector_before, vector_after))
+    rot_angle = np.arccos(cosine(vector_before, vector_after))
     return rot_axis, rot_angle
 
 
@@ -63,7 +63,7 @@ def axis_rotation_matrix(unit_rotation_axis, rotation_angle):
     ])
     I3 = np.eye(3)
     T = A_1 + (I3 - A_1) * np.cos(rotation_angle) + A_2 * np.sin(rotation_angle)
-    return T
+    return T.T
 
 
 # 求解一个点在另一个坐标系中的坐标值。该坐标系给定了z轴的方向，x轴位于原坐标系x0y0平面上。
@@ -82,8 +82,9 @@ def coordinate_rotation_matrix(point, vector_z):
         [x3, y3, z3],
                  ])
     p1, p2, p3 = point
-    p4 = np.array([p1, p2, p3]).T
-    p4_p = np.dot(R, p4)
+    p4 = np.array([p1, p2, p3])
+
+    p4_p = np.dot(p4, R)
     point_p = p4_p.ravel()
     return point_p
 
@@ -119,23 +120,46 @@ number_of_rings = 12
 # 3代表光线坐标系
 v1 = np.array([0, 0, 1])     # 镜面法线向量在镜面坐标系中的坐标值
 # 计算太阳高度角
-# lalo = [37.22, 97.23]   # 手动指定纬度和经度，也可以注释该行，反注释下行，自动获取当前位置的经纬度进行计算
-lalo = get_lalo()     # 计算当前经纬度
-observer = ephem.Observer()
-observer.lat, observer.lon = str(lalo[0]), str(lalo[1])
-
-# observer.date = ephem.Date('2020/03/20 07:00:00.00')  # 手动指定时间(UTC时间)，也可以注释该行，反注释下面两行，自动获取当前时间进行计算
-observer.date = datetime.datetime.utcnow()    # 计算当前时间
-print("\n当前时间为:\n%s" % ephem.localtime(observer.date))
-
-sun = ephem.Sun()
-sun.compute(observer)
-
-print("太阳高度角: %s \n太阳方位角: %s" % (sun.alt, sun.az))
-altitude = np.rad2deg(sun.alt)  # 也可以注释该两行，反注释下面两行，手动输入需要计算的高度角和方位角
-azimuth = np.rad2deg(sun.az)
-# altitude = 52.78
-# azimuth = 180
+lalo = [37.22, 97.23]   # 手动指定纬度和经度，也可以注释该行，反注释下行，自动获取当前位置的经纬度进行计算
+# lalo = get_lalo()     # 计算当前经纬度
+# observer = ephem.Observer()
+# observer.lat, observer.lon = str(lalo[0]), str(lalo[1])
+#
+# observer.date = ephem.Date('2020/03/20 05:00:00.00')  # 手动指定时间(UTC时间)，也可以注释该行，反注释下面两行，自动获取当前时间进行计算
+# observer.date = datetime.datetime.utcnow()    # 计算当前时间
+# # print("\n当前时间为:\n%s" % ephem.localtime(observer.date))
+#
+# sun = ephem.Sun()
+# sun.compute(observer)
+#
+# previous_midnight = ephem.date(datetime.date.today())
+# next_midnight = ephem.date(datetime.date.today()) + 1
+#
+#
+# sun_rising = observer.previous_rising(sun)
+# sun_rising_local = ephem.date(ephem.localtime(sun_rising))
+# sun_setting = observer.next_setting(sun)
+# sun_setting_local = ephem.date(ephem.localtime(sun_setting))
+# sun_transit = observer.previous_transit(sun)
+# sun_transit_local = ephem.date(ephem.localtime(sun_transit))
+#
+# if sun_rising_local < previous_midnight:
+#     sun_rising = observer.next_rising(sun)
+# if sun_setting_local > next_midnight:
+#     sun_setting = observer.previous_setting(sun)
+# if sun_transit_local < previous_midnight:
+#     sun_transit = observer.next_transit(sun)
+#
+#
+# print("日出时间: %s \n日落时间: %s" % (ephem.localtime(sun_rising),
+#                                ephem.localtime(sun_setting)))
+# print("太阳当顶时间: %s" % ephem.localtime(sun_transit))
+#
+# print("太阳高度角: %s \n太阳方位角: %s" % (sun.alt, sun.az))
+# altitude = np.rad2deg(sun.alt)  # 也可以注释该两行，反注释下面两行，手动输入需要计算的高度角和方位角
+# azimuth = np.rad2deg(sun.az)
+altitude = 51.972813
+azimuth = 180
 v3 = angle2vector(altitude, azimuth)    # 光线向量在世界坐标系中的坐标值，指向太阳！
 
 radius = np.zeros(number_of_rings)      # 用来记录各圈的半径
@@ -146,7 +170,7 @@ for i in range(number_of_rings - 1):
     alpha = np.arctan(radius[i] / (tower_height - mirror_center_height))
     beta = np.arcsin(D/2/np.sqrt(radius[i]**2+(tower_height-mirror_center_height)**2))
     distance_to_increase = D/np.cos(alpha + beta)
-    radius[i+1] = radius[i] + distance_to_increase
+    radius[i+1] = np.ceil(radius[i] + distance_to_increase)     # 可以去掉！ceil
 number[number_of_rings-1] = np.floor(2*np.pi*radius[number_of_rings-1]/min_distance)
 
 # 定义镜子列表
